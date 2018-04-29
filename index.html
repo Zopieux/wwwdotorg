@@ -1,0 +1,205 @@
+<html>
+<head>
+<style type="text/css">
+    body {
+        background-color: #eee;
+        padding: 1rem;
+        margin: 0;
+    }
+
+    #www {
+        border: 1px solid #aaa;
+        border-radius: 3px;
+        font-size: .9rem;
+        padding: .3rem .5rem;
+        padding-left: calc(1.1rem + 6px * 2);
+        font: sans-serif;
+        width: 100%;
+        background-color: white;
+    }
+
+    form {
+        position: relative;
+    }
+
+    form::before {
+        content: '';
+        display: block;
+        background: url('info.svg') no-repeat;
+        background-size: contain;
+        position: absolute;
+        top: .35rem;
+        left: .35rem;
+        width: 1.1rem;
+        height: 1.1rem;
+    }
+
+    p {
+        color: #aaa;
+        position: fixed;
+        right: 1rem;
+        bottom: 1rem;
+        margin: 0;
+        padding: 0;
+    }
+    a, a:visited, a:focus {
+        color: inherit;
+    }
+    a:hover {
+        color: #888;
+        text-decoration: underline;
+    }
+</style>
+<title>WWWDOTORG</title>
+</head>
+
+<body>
+
+    <form>
+        <input type="text" id="www" value="http://www." readonly />
+    </form>
+
+    <p>Because <a href="https://www.youtube.com/watch?v=Jsi5K1xIDL8" target="_blank">this</a>.</p>
+
+<script type="text/javascript">
+function randomInt(max) {
+    return Math.floor(Math.random() * Math.floor(max));
+}
+
+const WWWDOTORG = [
+    [.15, ["doby", "daby", "ydouby", "da", "w"]],
+    [.15, ["dobyDOT", "doubyly", "...", "DOT"]],
+    [.15, ["w", "you", "ww", "YOU", "YOUY", "w/"]],
+    [.15, ["/", "//", "///", "/", "\\", "\\\\", "SLASH", "salsachips"]],
+    [.15, [".", "com", "dotcom", "DOT", "DOTCOM", ".com"]],
+    [.25, ["dobydot", "douby", "doubyly", "dot"]],
+    [.25, [".w", "you", "ww", "..", "YOU", "YOUY", "w/"]],
+    [.25, ["lada", "tada", "tala", "tadata"]],
+    [0, [".org"]], // 8
+]
+
+let initialized = false, playing = false, pleaseEnd = false;
+let sounds, sources, www, ctx, curr, next;
+
+async function init() {
+    www = document.getElementById('www');
+    ctx = new AudioContext();
+    const sndPromises = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        .map(e => './sounds/snd0' + e + '.wav')
+        .map(url => new Promise((resolve, reject) => {
+            const audio = new Audio();
+            audio.addEventListener(
+                'canplaythrough',
+                () => resolve(audio),
+                false);
+            audio.loop = false;
+            audio.src = url;
+        }));
+    sounds = await Promise.all(sndPromises);
+    sources = sounds.map(s => ctx.createMediaElementSource(s));
+    curr = 0, next = 1 + randomInt(sounds.length - 2);
+
+    function swap() {
+        console.log('swap', curr, next);
+        sounds[next].play();
+        sources[next].connect(ctx.destination);
+        sources[curr].disconnect(ctx.destination);
+        curr = next;
+        if (next == 8) {
+            actualyType();
+            return;
+        }
+        while (next != -1 && curr == next)
+            next = randomInt(sounds.length - 1);
+    }
+    sounds.slice(0, -1).forEach(s => s.addEventListener('ended', swap));
+    sources[curr].connect(ctx.destination);
+    sounds[curr].play();
+    playing = true;
+
+    const timeouts = [];
+
+    function actualyType () {
+        let [speed, words] = WWWDOTORG[curr], word = words[randomInt(words.length)];
+
+        function letter(l) {
+            www.value += l;
+            www.scrollLeft = www.scrollWidth;
+        }
+        timeouts.forEach(clearTimeout);
+        timeouts.length = 0;
+        for (let i = 0; i < word.length; i++)
+            timeouts.push(setTimeout(() => letter(word.charAt(i)), i * 20 + Math.random() * 20));
+    }
+
+    function type (t) {
+        let [speed, words] = WWWDOTORG[curr];
+        if (curr != 8 && Math.random() < speed) {
+            actualyType();
+        }
+        requestAnimationFrame(type);
+    }
+    requestAnimationFrame(type);
+}
+
+document.querySelector('body').addEventListener('click', async function() {
+    if (!initialized) {
+        initialized = true;
+        init();
+        return;
+    }
+
+    if (next == 8) {
+        return;
+    }
+
+    if (playing) {
+        next = 8;
+    } else {
+        sounds[curr].play();
+    }
+    playing = !playing;
+});
+/*
+    // slow cross-fade
+    const gain1 = ctx.createGain();
+    const gain2 = ctx.createGain();
+    gain1.gain.value = 1;
+    gain2.gain.value = 0;
+
+    [gain1, gain2].forEach(g => g.connect(ctx.destination));
+
+    let goingDown = gain1, goingUp = gain2;
+    sources[curr].connect(goingDown);
+    sources[next].connect(goingUp);
+
+    sounds.forEach(s => s.play());
+
+    function swap() {
+
+        goingDown.gain.setValueAtTime(goingDown.gain.value, ctx.currentTime);
+        goingDown.gain.linearRampToValueAtTime(0, ctx.currentTime + 2);
+        goingUp.gain.setValueAtTime(goingUp.gain.value, ctx.currentTime);
+        goingUp.gain.linearRampToValueAtTime(1, ctx.currentTime + 2);
+
+        setTimeout(function() {
+            // disconnect from the silent one
+            sources[curr].disconnect(goingDown);
+            curr = next;
+            next = randomInt(sounds.length);
+            // connect next to goingDown, which will be goingUp soon
+            console.log("next is", next);
+            sources[next].connect(goingDown);
+            [goingUp, goingDown] = [goingDown, goingUp];
+            setTimeout(swap, 3000);
+        }, 2000);
+    };
+
+    setTimeout(swap, 3000);
+*/
+
+</script>
+
+</body>
+
+</html>
